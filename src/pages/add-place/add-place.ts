@@ -4,6 +4,12 @@ import { LocationPage } from '../location/location';
 import { Location } from '../../models/location';
 import { Geolocation } from '@ionic-native/geolocation';
 import { Camera, CameraOptions } from '@ionic-native/camera';
+import { NgForm } from '@angular/forms';
+import { PlacesService } from '../../services/places.service';
+import { File } from '@ionic-native/file';
+
+declare var cordova:any;
+
 @IonicPage()
 @Component({
   selector: 'page-add-place',
@@ -12,9 +18,10 @@ import { Camera, CameraOptions } from '@ionic-native/camera';
 export class AddPlacePage implements OnInit{
   location:Location;
   chosen:boolean=false;
+  imageUrl:string='';
   constructor(private modalCtrl:ModalController,private geolocation:Geolocation,
     private loadingCtrl:LoadingController,private toastCtrl:ToastController,
-  private camera:Camera
+  private camera:Camera,private placesSrv:PlacesService,private file:File
   ) {
   }
   ngOnInit(){
@@ -53,6 +60,32 @@ export class AddPlacePage implements OnInit{
     })
   }
   onTakePhoto(){
-
+    this.camera.getPicture({
+      encodingType:this.camera.EncodingType.JPEG,
+      correctOrientation:true
+    }).then(picture=>{
+      const currentName = picture.replace(/^.*[\\\/]/,'');
+      const path = picture.replace(/[^\/]*$/,'');
+      const newFileName = new Date().getUTCMilliseconds()+'.jpg';
+      this.file.moveFile(path, currentName, cordova.file.dataDirectory,newFileName).then(data=>{
+        this.imageUrl = data.nativeURL;
+        this.camera.cleanup();
+      }).catch(error=>{
+        this.imageUrl='';
+        const toast = this.toastCtrl.create({
+          message:'Couldnt save the image, please try again',
+          duration:2500
+        });
+        toast.present();
+        this.camera.cleanup();
+      });
+      });
+      this.imageUrl=picture;
+    }
+  onSubmit(form:NgForm){
+    this.placesSrv.addPlace(form.value.title,form.value.description,this.location,this.imageUrl);
+    this.imageUrl='';
+    this.chosen=false;
+    form.reset();
   }
 }
